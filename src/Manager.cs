@@ -36,7 +36,22 @@ namespace TS.ECS
         /// </summary>
         private readonly Stopwatch sw;
 
-        /// <summary>
+		/// <summary>
+		/// Occurs when a new component is added.
+		/// </summary>
+		public event EventHandler<ComponentAddedEventArgs> OnComponentAdded;
+
+		/// <summary>
+		/// Occurs when a component is removed.
+		/// </summary>
+		public event EventHandler<ComponentRemovedEventArgs> OnComponentRemoved;
+  
+		/// <summary>
+		/// Occurs when an entity is created.
+		/// </summary>
+		public event EventHandler<Entity> OnCreateEntity;
+
+		/// <summary>
         /// 
         /// </summary>
         public Manager()
@@ -122,6 +137,7 @@ namespace TS.ECS
         {
             var entity = new Entity();
             entityComponentMap.Add(entity.Id, new Tuple<Entity, List<IComponent>>(entity, new List<IComponent>()));
+			OnCreateEntity?.Invoke(this, entity);
             return entity;
         }
 
@@ -134,6 +150,7 @@ namespace TS.ECS
         {
             var entity = Activator.CreateInstance<T>();
             entityComponentMap.Add(entity.Id, new Tuple<Entity, List<IComponent>>(entity, new List<IComponent>()));
+			OnCreateEntity?.Invoke(this, entity);
             return entity;
         }
         
@@ -149,6 +166,7 @@ namespace TS.ECS
             if (entityComponentMap.ContainsKey(entity.Id))
             {
                 entityComponentMap[entity.Id].Item2.Add(component);
+				OnComponentAdded?.Invoke(this, new ComponentAddedEventArgs(entity, component));
             }
         }
         
@@ -163,8 +181,11 @@ namespace TS.ECS
         {
             if (entityComponentMap.ContainsKey(entity.Id))
             {
-                if (entityComponentMap[entity.Id].Item2.Contains(component))
-                    entityComponentMap[entity.Id].Item2.Remove(component);
+				if (entityComponentMap[entity.Id].Item2.Contains(component))
+				{
+					entityComponentMap[entity.Id].Item2.Remove(component);
+					OnComponentRemoved?.Invoke(this, new ComponentRemovedEventArgs(entity, component));
+				}
             }
         }
         

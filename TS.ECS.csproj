@@ -40,6 +40,8 @@
     <Compile Include="src\Manager.cs" />
     <Compile Include="src\MessageEventArgs.cs" />
     <Compile Include="src\Properties\AssemblyInfo.cs" />
+    <Compile Include="src\ComponentAddedEventArgs.cs" />
+    <Compile Include="src\ComponentRemovedEventArgs.cs" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
