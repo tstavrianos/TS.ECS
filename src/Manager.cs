@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace TS.ECS
 {
@@ -109,7 +110,7 @@ namespace TS.ECS
             
             foreach (var system in messageSubscribers[messageType]) 
             {
-                system.EnqueueMessage(new MessageEventArgs(messageType, messageData, this, sender));
+				Task.Run(() => system.HandleMessage(new MessageEventArgs(messageType, messageData, this, sender)));
             }
         }
         
@@ -187,7 +188,7 @@ namespace TS.ECS
         /// <returns></returns>
         public C GetComponent<E, C>(E entity) where E: Entity where C: IComponent
         {
-            return (C)GetComponent<E>(entity, typeof(C));
+            return (C)GetComponent(entity, typeof(C));
         }
 
         /// <summary>
