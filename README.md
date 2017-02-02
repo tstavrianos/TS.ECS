@@ -10,7 +10,6 @@ Progress:
 - [x] Entity
 - [x] Component
 - [x] Base System
-- [ ] Concurrent versions of the above?
 - [ ] Sort the functions (kind of all all over the place at the moment)
 - [ ] Fill in the comment placeholders
 - [ ] Documentation

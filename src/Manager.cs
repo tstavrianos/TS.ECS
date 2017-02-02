@@ -100,8 +100,7 @@ namespace TS.ECS
         /// <param name="sender"></param>
         /// <param name="messageType"></param>
         /// <param name="messageData"></param>
-        /// <param name="queued"></param>
-        public void PostEvent(object sender, int messageType, object messageData, bool queued = false)
+        public void Broadcast(object sender, int messageType, object messageData)
         {
             if (!messageSubscribers.ContainsKey(messageType))
             {
@@ -110,14 +109,7 @@ namespace TS.ECS
             
             foreach (var system in messageSubscribers[messageType]) 
             {
-                if (!queued)
-                {
-                    system.HandleMessage(sender, messageType, messageData);
-                }
-                else
-                {
-                    system.queuedMessages.Enqueue(new MessageEventArgs(messageType, messageData, sender));
-                }
+                system.EnqueueMessage(new MessageEventArgs(messageType, messageData, this, sender));
             }
         }
         

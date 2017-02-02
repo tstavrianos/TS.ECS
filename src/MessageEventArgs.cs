@@ -13,10 +13,11 @@ namespace TS.ECS
         /// <param name="messageType"></param>
         /// <param name="messageData"></param>
         /// <param name="sender"></param>
-        public MessageEventArgs(int messageType, object messageData, object sender = null)
+        public MessageEventArgs(int messageType, object messageData, Manager manager, object sender = null)
         {
             MessageType = messageType;
             MessageData = messageData;
+            Manager = manager;
             Sender = sender;
         }
         
@@ -29,6 +30,11 @@ namespace TS.ECS
         /// 
         /// </summary>
         public object MessageData { get; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public Manager Manager { get; }
 
         /// <summary>
         /// 

@@ -1,5 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace TS.ECS
 {
@@ -8,6 +10,31 @@ namespace TS.ECS
     /// </summary>
     public abstract class BaseSystem
     {
+        /// <summary>
+        /// 
+        /// </summary>
+        private BlockingCollection<MessageEventArgs> messageQueue = new BlockingCollection<MessageEventArgs>();
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private ManualResetEvent mre = new ManualResetEvent(true);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private int amountOfConsumers;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private object o = new object();
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        public event EventHandler<MessageEventArgs> OnMessage;
+
         /// <summary>
         /// 
         /// </summary>
@@ -56,41 +83,64 @@ namespace TS.ECS
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="messageType"></param>
-        /// <param name="messageData"></param>
-        internal void HandleMessage(object sender, int messageType, object messageData)
+        /// <param name="args"></param>
+        private void HandleMessage(MessageEventArgs args)
         {
             if (OnMessage != null)
             {
-                var args = new MessageEventArgs(messageType, messageData, sender);
-                OnMessage.Invoke(sender, args);
+                OnMessage.Invoke(args.Sender, args);
+            }
+        }
+        
+        /// <summary>
+        /// Based on: http://stackoverflow.com/a/15232041 
+        /// </summary>
+        /// <param name="message"></param>
+        internal void EnqueueMessage(MessageEventArgs message)
+        {
+            messageQueue.Add(message);
+
+            mre.WaitOne();
+            if (Math.Floor((double)messageQueue.Count / 100)+1 > amountOfConsumers)
+            {
+                Interlocked.Increment(ref amountOfConsumers);
+    
+                var task = Task.Factory.StartNew(() =>
+                {
+                    MessageEventArgs msg;
+                    bool repeat = true;
+    
+                    while (repeat)
+                    {
+                        while ((messageQueue.Count > 0) && (Math.Floor((double)((messageQueue.Count + 50) / 100)) + 1 >= amountOfConsumers))
+                        {
+                            msg = messageQueue.Take();
+                            HandleMessage(msg);
+                        }
+    
+                        lock (o)
+                        {
+                            mre.Reset();
+    
+                            if ((messageQueue.Count == 0) || (Math.Ceiling((double)((messageQueue.Count + 51) / 100)) < amountOfConsumers))
+                            {
+                                ConsumerQuit();
+                                repeat = false;
+                            }
+    
+                            mre.Set();
+                        }
+                    }
+                });
             }
         }
         
         /// <summary>
         /// 
         /// </summary>
-        internal Queue<MessageEventArgs> queuedMessages = new Queue<MessageEventArgs>();
-        
-        /// <summary>
-        /// 
-        /// </summary>
-        public event EventHandler<MessageEventArgs> OnMessage;
-        
-        /// <summary>
-        /// 
-        /// </summary>
-        public void TriggerQueuedMessages()
+        private void ConsumerQuit()
         {
-            while(queuedMessages.Count != 0)
-            {
-                var args = queuedMessages.Dequeue();
-                if (OnMessage != null)
-                {
-                    OnMessage.Invoke(args.Sender, args);
-                }
-            }
+            Interlocked.Decrement(ref amountOfConsumers);
         }
         
         /// <summary>
