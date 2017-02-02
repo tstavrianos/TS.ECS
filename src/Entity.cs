@@ -28,7 +28,7 @@ namespace TS.ECS
         /// <typeparam name="C"></typeparam>
         /// <param name="manager"></param>
         /// <param name="component"></param>
-        public void AddComponent<C>(Manager manager, C component) where C: Component
+        public void AddComponent<C>(Manager manager, C component) where C: IComponent
         {
             manager.AddComponent(this, component);
         }
@@ -38,7 +38,7 @@ namespace TS.ECS
         /// </summary>
         /// <typeparam name="C"></typeparam>
         /// <param name="component"></param>
-        public void AddComponent<C>(C component) where C: Component
+        public void AddComponent<C>(C component) where C: IComponent
         {
             AddComponent(Manager.Instance, component);
         }
@@ -49,7 +49,7 @@ namespace TS.ECS
         /// <typeparam name="C"></typeparam>
         /// <param name="manager"></param>
         /// <param name="component"></param>
-        public void RemoveComponent<C>(Manager manager, C component) where C: Component
+        public void RemoveComponent<C>(Manager manager, C component) where C: IComponent
         {
             manager.RemoveComponent(this, component);
         }
@@ -59,7 +59,7 @@ namespace TS.ECS
         /// </summary>
         /// <typeparam name="C"></typeparam>
         /// <param name="component"></param>
-        public void RemoveComponent<C>(C component) where C: Component
+        public void RemoveComponent<C>(C component) where C: IComponent
         {
             RemoveComponent(Manager.Instance, component);
         }
@@ -70,7 +70,7 @@ namespace TS.ECS
         /// <typeparam name="C"></typeparam>
         /// <param name="manager"></param>
         /// <returns></returns>
-        public C GetComponent<C>(Manager manager) where C: Component
+        public C GetComponent<C>(Manager manager) where C: IComponent
         {
             return (C)manager.GetComponent(this, typeof(C));
         }
@@ -80,7 +80,7 @@ namespace TS.ECS
         /// </summary>
         /// <typeparam name="C"></typeparam>
         /// <returns></returns>
-        public C GetComponent<C>() where C: Component
+        public C GetComponent<C>() where C: IComponent
         {
             return GetComponent<C>(Manager.Instance);
         }
@@ -91,7 +91,7 @@ namespace TS.ECS
         /// <typeparam name="C"></typeparam>
         /// <param name="manager"></param>
         /// <returns></returns>
-        public IEnumerable<C> GetComponents<C>(Manager manager) where C: Component
+        public IEnumerable<C> GetComponents<C>(Manager manager) where C: IComponent
         {
             return manager.GetComponents(this, typeof(C)).Cast<C>();
         }
@@ -101,7 +101,7 @@ namespace TS.ECS
         /// </summary>
         /// <typeparam name="C"></typeparam>
         /// <returns></returns>
-        public IEnumerable<C> GetComponents<C>() where C: Component
+        public IEnumerable<C> GetComponents<C>() where C: IComponent
         {
             return GetComponents<C>(Manager.Instance);
         }
@@ -111,7 +111,7 @@ namespace TS.ECS
         /// </summary>
         /// <param name="manager"></param>
         /// <returns></returns>
-        public IEnumerable<Component> GetAllComponents(Manager manager)
+        public IEnumerable<IComponent> GetAllComponents(Manager manager)
         {
             return manager.GetAllComponents(this);
         }
@@ -121,7 +121,7 @@ namespace TS.ECS
         /// </summary>
         /// <typeparam name="C"></typeparam>
         /// <returns></returns>
-        public IEnumerable<Component> GetAllComponents<C>()
+        public IEnumerable<IComponent> GetAllComponents<C>()
         {
             return GetAllComponents(Manager.Instance);
         }

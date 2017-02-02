@@ -35,7 +35,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="src\BaseSystem.cs" />
-    <Compile Include="src\Component.cs" />
+    <Compile Include="src\IComponent.cs" />
     <Compile Include="src\Entity.cs" />
     <Compile Include="src\Manager.cs" />
     <Compile Include="src\MessageEventArgs.cs" />

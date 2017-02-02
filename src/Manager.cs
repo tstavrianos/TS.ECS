@@ -23,7 +23,7 @@ namespace TS.ECS
         /// <summary>
         /// 
         /// </summary>
-        private readonly Dictionary<Guid, Tuple<Entity, List<Component>>> entityComponentMap = new Dictionary<Guid, Tuple<Entity, List<Component>>>();
+        private readonly Dictionary<Guid, Tuple<Entity, List<IComponent>>> entityComponentMap = new Dictionary<Guid, Tuple<Entity, List<IComponent>>>();
 
         /// <summary>
         /// 
@@ -33,7 +33,7 @@ namespace TS.ECS
         /// <summary>
         /// 
         /// </summary>
-        private Stopwatch sw;
+        private readonly Stopwatch sw;
 
         /// <summary>
         /// 
@@ -120,7 +120,7 @@ namespace TS.ECS
         public Entity CreateEntity()
         {
             var entity = new Entity();
-            entityComponentMap.Add(entity.Id, new Tuple<Entity, List<Component>>(entity, new List<Component>()));
+            entityComponentMap.Add(entity.Id, new Tuple<Entity, List<IComponent>>(entity, new List<IComponent>()));
             return entity;
         }
 
@@ -132,7 +132,7 @@ namespace TS.ECS
         public T CreateEntity<T>() where T: Entity
         {
             var entity = Activator.CreateInstance<T>();
-            entityComponentMap.Add(entity.Id, new Tuple<Entity, List<Component>>(entity, new List<Component>()));
+            entityComponentMap.Add(entity.Id, new Tuple<Entity, List<IComponent>>(entity, new List<IComponent>()));
             return entity;
         }
         
@@ -143,7 +143,7 @@ namespace TS.ECS
         /// <typeparam name="C"></typeparam>
         /// <param name="entity"></param>
         /// <param name="component"></param>
-        public void AddComponent<E, C>(E entity, C component) where E: Entity where C: Component
+        public void AddComponent<E, C>(E entity, C component) where E: Entity where C: IComponent
         {
             if (entityComponentMap.ContainsKey(entity.Id))
             {
@@ -158,7 +158,7 @@ namespace TS.ECS
         /// <typeparam name="C"></typeparam>
         /// <param name="entity"></param>
         /// <param name="component"></param>
-        public void RemoveComponent<E, C>(E entity, C component) where E: Entity where C: Component
+        public void RemoveComponent<E, C>(E entity, C component) where E: Entity where C: IComponent
         {
             if (entityComponentMap.ContainsKey(entity.Id))
             {
@@ -173,7 +173,7 @@ namespace TS.ECS
         /// <typeparam name="E"></typeparam>
         /// <typeparam name="C"></typeparam>
         /// <returns></returns>
-        public IEnumerable<E> EntitiesWithComponent<E, C>() where E: Entity where C: Component
+        public IEnumerable<E> EntitiesWithComponent<E, C>() where E: Entity where C: IComponent
         {
             return entityComponentMap.Values.Where(x => x.Item2.Any(c => c is C)).Select(x => x.Item1).Cast<E>();
         }
@@ -185,7 +185,7 @@ namespace TS.ECS
         /// <typeparam name="C"></typeparam>
         /// <param name="entity"></param>
         /// <returns></returns>
-        public C GetComponent<E, C>(E entity) where E: Entity where C: Component
+        public C GetComponent<E, C>(E entity) where E: Entity where C: IComponent
         {
             return (C)GetComponent<E>(entity, typeof(C));
         }
@@ -197,7 +197,7 @@ namespace TS.ECS
         /// <param name="entity"></param>
         /// <param name="componentType"></param>
         /// <returns></returns>
-        internal Component GetComponent<E>(E entity, Type componentType) where E: Entity
+        internal IComponent GetComponent<E>(E entity, Type componentType) where E: Entity
         {
             if (entityComponentMap.ContainsKey(entity.Id))
             {
@@ -213,7 +213,7 @@ namespace TS.ECS
         /// <typeparam name="C"></typeparam>
         /// <param name="entity"></param>
         /// <returns></returns>
-        public IEnumerable<C> GetComponents<E, C>(E entity) where E: Entity where C: Component
+        public IEnumerable<C> GetComponents<E, C>(E entity) where E: Entity where C: IComponent
         {
             if (entityComponentMap.ContainsKey(entity.Id))
             {
@@ -229,13 +229,13 @@ namespace TS.ECS
         /// <param name="entity"></param>
         /// <param name="componentType"></param>
         /// <returns></returns>
-        internal IEnumerable<Component> GetComponents<E>(E entity, Type componentType) where E: Entity
+        internal IEnumerable<IComponent> GetComponents<E>(E entity, Type componentType) where E: Entity
         {
             if (entityComponentMap.ContainsKey(entity.Id))
             {
                 return entityComponentMap[entity.Id].Item2.Where(c => c.GetType() == componentType);
             }
-            return new List<Component>();
+            return new List<IComponent>();
         }
         
         /// <summary>
@@ -244,13 +244,13 @@ namespace TS.ECS
         /// <typeparam name="E"></typeparam>
         /// <param name="entity"></param>
         /// <returns></returns>
-        public IEnumerable<Component> GetAllComponents<E>(E entity) where E: Entity
+        public IEnumerable<IComponent> GetAllComponents<E>(E entity) where E: Entity
         {
             if (entityComponentMap.ContainsKey(entity.Id))
             {
                 return entityComponentMap[entity.Id].Item2.AsReadOnly();
             }
-            return new List<Component>();
+            return new List<IComponent>();
         }
         
         /// <summary>
