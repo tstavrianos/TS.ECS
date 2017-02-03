@@ -13,7 +13,8 @@ Progress:
 - [x] Sort the functions (kind of all all over the place at the moment)
 - [x] Fill in the comment placeholders
 - [ ] Documentation
-- [ ] Test in .NET Core
-- [ ] Test in Mono
-- [x] Test in Windows
-- [ ] Test in Debian/Linux
+- [x] Build in Windows using .NET Framework
+- [ ] Build in Windows using .NET Core
+- [ ] Build in Windows using Mono
+- [ ] Build in Debian/Linux using .NET Core
+- [ ] Build in Debian/Linux using Mono
