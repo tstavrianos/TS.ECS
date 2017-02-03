@@ -14,12 +14,13 @@ namespace TS.ECS
         /// <param name="messageData">The data that we want to follow the message to its destination</param>
         /// <param name="manager">The manager that broadcast the message</param>
 		/// <param name="sender">The external object that triggered the broadcast command (can be null)</param>
-        internal MessageEventArgs(int messageType, object messageData, Manager manager, object sender = null)
+        internal MessageEventArgs(int messageType, object messageData, Manager manager, object sender, bool async)
         {
             MessageType = messageType;
             MessageData = messageData;
             Manager = manager;
             Sender = sender;
+			Async = async;
         }
         
         /// <summary>
@@ -41,5 +42,10 @@ namespace TS.ECS
         /// The external object that triggered the broadcast command (can be null)
         /// </summary>
         internal object Sender { get; }
+
+		/// <summary>
+		/// Was this message broacast asynchronously?
+		/// </summary>
+		internal bool Async { get; }
     }
 }

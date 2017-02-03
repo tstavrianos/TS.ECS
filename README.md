@@ -10,8 +10,8 @@ Progress:
 - [x] Entity
 - [x] Component
 - [x] Base System
-- [ ] Sort the functions (kind of all all over the place at the moment)
-- [ ] Fill in the comment placeholders
+- [x] Sort the functions (kind of all all over the place at the moment)
+- [x] Fill in the comment placeholders
 - [ ] Documentation
 - [ ] Test in .NET Core
 - [ ] Test in Mono
