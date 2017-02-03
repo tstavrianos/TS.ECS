@@ -1,16 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace TS.ECS
 {
     /// <summary>
     /// Base system. All systems should extend this class.
     /// </summary>
-    public abstract class BaseSystem
+    public abstract class BaseSystem: IDisposable
     {
         /// <summary>
         /// Event triggered when a message type that we are subscribed to gets broadcast
         /// </summary>
         public event EventHandler<MessageEventArgs> OnMessage;
+
+		/// <summary>
+		/// List of managers we are registered to.
+		/// </summary>
+		internal HashSet<Manager> registeredManagers = new HashSet<Manager>();
 
 		/// <summary>
 		/// Called by each manager we are registered to, everytime their Tick function is called
@@ -37,6 +43,8 @@ namespace TS.ECS
 		/// <param name="messageType">The message type that we are interested in</param>
 		public void Subscribe(Manager manager, int messageType)
         {
+			if (manager == null) throw new ArgumentNullException(nameof(manager));
+
             manager.Subscribe(messageType, this);
         }
         
@@ -58,7 +66,9 @@ namespace TS.ECS
 		/// <param name="messageType">The message type that we are not interested in anymore</param>
         public void Unsubscribe(Manager manager, int messageType)
         {
-            manager.Unsubscribe(messageType, this);
+			if (manager == null) throw new ArgumentNullException(nameof(manager));
+   
+			manager.Unsubscribe(messageType, this);
         }
         
         /// <summary>
@@ -77,7 +87,9 @@ namespace TS.ECS
 		/// <param name="manager">The manager we want to be added to</param>
 		public void RegisterSystem(Manager manager)
         {
-            manager.RegisterSystem(this);
+			if (manager == null) throw new ArgumentNullException(nameof(manager));
+   
+			manager.RegisterSystem(this);
         }
         
         /// <summary>
@@ -94,7 +106,9 @@ namespace TS.ECS
         /// <param name="manager">The manage we want to be removed from</param>
         public void UnregisterSystem(Manager manager)
         {
-            manager.UnregisterSystem(this);
+			if (manager == null) throw new ArgumentNullException(nameof(manager));
+   
+			manager.UnregisterSystem(this);
         }
         
         /// <summary>
@@ -104,5 +118,51 @@ namespace TS.ECS
         {
             UnregisterSystem(Manager.Instance);
         }
+
+		/// <summary>
+		/// Public implementation of Dispose pattern callable by consumers
+		/// </summary>
+		public void Dispose()
+		{
+			Dispose(true);
+			foreach (var manager in registeredManagers)
+			{
+				manager?.DestroyedSystem(this);
+			}
+			GC.SuppressFinalize(this);
+		}
+
+		/// <summary>
+		/// Protected implementation of Dispose pattern
+		/// </summary>
+		/// <param name="disposing">Do we have any managed objects to free?</param>
+		protected virtual void Dispose(bool disposing)
+		{
+		}
+
+		/// <summary>
+		/// Releases unmanaged resources and performs other cleanup operations before the <see cref="T:TS.ECS.Entity"/> is
+		/// reclaimed by garbage collection.
+		/// </summary>
+		~BaseSystem()
+		{
+			Dispose(false);
+			foreach (var manager in registeredManagers)
+			{
+				manager?.DestroyedSystem(this);
+			}
+		}
+
+		/// <summary>
+		/// Remove the manager from the list of managers we are registered to
+		/// </summary>
+		/// <param name="manager">Manager.</param>
+		internal void DestroyedManager(Manager manager)
+		{
+			if (registeredManagers.Contains(manager))
+			{
+				registeredManagers.Remove(manager);
+			}
+		}
     }
 }

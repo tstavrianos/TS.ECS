@@ -9,7 +9,7 @@ namespace TS.ECS
     /// <summary>
     /// 
     /// </summary>
-    public class Manager
+    public class Manager: IDisposable
     {
         /// <summary>
         /// Variable holding the default manager
@@ -52,11 +52,18 @@ namespace TS.ECS
 		public event EventHandler<Entity> OnCreateEntity;
 
 		/// <summary>
+		/// Internal id used to reference this Manager. Used to speed-up equality checks.
+		/// </summary>
+		internal readonly Guid Id;
+
+		/// <summary>
         /// Create a new instance of type Manager
         /// </summary>
         public Manager()
         {
-            sw = new Stopwatch();
+			Id = Guid.NewGuid();
+
+			sw = new Stopwatch();
             sw.Start();
         }
 
@@ -85,7 +92,7 @@ namespace TS.ECS
 			var dt = sw.ElapsedMilliseconds;
 			foreach (var system in registeredSystems)
 			{
-				system.Tick(this, dt, false);
+				system?.Tick(this, dt, false);
 			}
 			sw.Restart();
 		}
@@ -98,7 +105,7 @@ namespace TS.ECS
 		{
 			sw.Stop();
 			var dt = sw.ElapsedMilliseconds;
-			await Task.WhenAll(registeredSystems.Select(s => Task.Factory.StartNew(() => s.Tick(this, dt, true))).ToArray());
+			await Task.WhenAll(registeredSystems.Select(s => Task.Factory.StartNew(() => s?.Tick(this, dt, true))).ToArray());
 			sw.Restart();
 		}
 
@@ -108,7 +115,7 @@ namespace TS.ECS
 		/// <param name="sender">Who is broadcasting the message?</param>
 		/// <param name="messageType">The message type that will be broadcast</param>
 		/// <param name="messageData">The data to attach to the broadcasted message</param>
-		public void Broadcast(object sender, int messageType, object messageData, bool async = false)
+		public void Broadcast(object sender, int messageType, object messageData)
 		{
 			if (!messageSubscribers.ContainsKey(messageType))
 			{
@@ -117,7 +124,7 @@ namespace TS.ECS
 
 			foreach (var system in messageSubscribers[messageType])
 			{
-				system.HandleMessage(new MessageEventArgs(messageType, messageData, this, sender, false));
+				system?.HandleMessage(new MessageEventArgs(messageType, messageData, this, sender, false));
 			}
 		}
 
@@ -127,25 +134,27 @@ namespace TS.ECS
 		/// <param name="sender">Who is broadcasting the message?</param>
 		/// <param name="messageType">The message type that will be broadcast</param>
 		/// <param name="messageData">The data to attach to the broadcasted message</param>
-		public async Task BroadcastAsync(object sender, int messageType, object messageData, bool async = false)
+		public async Task BroadcastAsync(object sender, int messageType, object messageData)
 		{
 			if (!messageSubscribers.ContainsKey(messageType))
 			{
 				return;
 			}
 
-			await Task.WhenAll(messageSubscribers[messageType].Select(s => Task.Factory.StartNew(() => s.HandleMessage(new MessageEventArgs(messageType, messageData, this, sender, true)))).ToArray());
+			await Task.WhenAll(messageSubscribers[messageType].Select(s => Task.Factory.StartNew(() => s?.HandleMessage(new MessageEventArgs(messageType, messageData, this, sender, true)))).ToArray());
 		}
 
 		/// <summary>
 		/// Add the specified system to our list of subscribers for the specified message type
 		/// </summary>
-		/// <typeparam name="T">type extending BaseSystem</typeparam>
+		/// <typeparam name="S">type extending BaseSystem</typeparam>
 		/// <param name="messageType">The message type that the system will be added to</param>
 		/// <param name="system">The system that will be added to our list of subscribers</param>
-		public void Subscribe<T>(int messageType, T system) where T: BaseSystem
+		public void Subscribe<S>(int messageType, S system) where S: BaseSystem
         {
-            if (!messageSubscribers.ContainsKey(messageType))
+			if (system == null) throw new ArgumentNullException(nameof(system));
+
+			if (!messageSubscribers.ContainsKey(messageType))
             {
                 messageSubscribers.Add(messageType, new HashSet<BaseSystem>());
             }
@@ -158,12 +167,14 @@ namespace TS.ECS
 		/// <summary>
 		/// Remove the specified system from our list of subscribers for the specified message type
 		/// </summary>
-		/// <typeparam name="T">type extending BaseSystem</typeparam>
+		/// <typeparam name="S">type extending BaseSystem</typeparam>
 		/// <param name="messageType">The message type that the system will be removed from</param>
 		/// <param name="system">The system that will be removed from our list of subscribers</param>
-		public void Unsubscribe<T>(int messageType, T system) where T: BaseSystem
+		public void Unsubscribe<S>(int messageType, S system) where S: BaseSystem
         {
-            if (messageSubscribers.ContainsKey(messageType))
+			if (system == null) throw new ArgumentNullException(nameof(system));
+   
+			if (messageSubscribers.ContainsKey(messageType))
             {
                 if (messageSubscribers[messageType].Contains(system))
                 {
@@ -175,38 +186,47 @@ namespace TS.ECS
         /// <summary>
         /// Create a new Entity and trigger the OnCreateEntity event
         /// </summary>
+        /// <typeparam name="T">type extending Entity</typeparam>
         /// <returns>the new Entity</returns>
-        public Entity CreateEntity()
+        public T CreateEntity<T>() where T: Entity
         {
-            var entity = new Entity();
+			var entity = (T)Activator.CreateInstance(typeof(T), this);
             entityComponentMap.Add(entity.Id, new Tuple<Entity, List<IComponent>>(entity, new List<IComponent>()));
 			OnCreateEntity?.Invoke(this, entity);
             return entity;
         }
 
-        /// <summary>
-        /// Create a new Entity and trigger the OnCreateEntity event
-        /// </summary>
-        /// <typeparam name="T">type extending Entity</typeparam>
-        /// <returns>the new Entity</returns>
-        public T CreateEntity<T>() where T: Entity
+		public void DestroyEntity<E>(E entity) where E: Entity
+		{
+			if (entity.Parent.Id != Id) throw new ArgumentException(nameof(entity));
+			if (entity == null) throw new ArgumentNullException(nameof(entity));
+
+			entity.Dispose();
+		}
+
+		internal void DestroyedEntity(Guid id)
+		{
+			if (entityComponentMap.ContainsKey(id))
+			{
+				entityComponentMap[id].Item2.Clear();
+				entityComponentMap.Remove(id);
+			}
+		}
+
+		/// <summary>
+		/// Link the entity and component together
+		/// </summary>
+		/// <typeparam name="E">type extending Entity</typeparam>
+		/// <typeparam name="C">type implementing IComponent</typeparam>
+		/// <param name="entity">The entity that the component will be added to</param>
+		/// <param name="component">The component being added</param>
+		public void AddComponent<E, C>(E entity, C component) where E: Entity where C: IComponent
         {
-            var entity = Activator.CreateInstance<T>();
-            entityComponentMap.Add(entity.Id, new Tuple<Entity, List<IComponent>>(entity, new List<IComponent>()));
-			OnCreateEntity?.Invoke(this, entity);
-            return entity;
-        }
-        
-        /// <summary>
-        /// Link the entity and component together
-        /// </summary>
-        /// <typeparam name="E">type extending Entity</typeparam>
-        /// <typeparam name="C">type implementing IComponent</typeparam>
-        /// <param name="entity">The entity that the component will be added to</param>
-        /// <param name="component">The component being added</param>
-        public void AddComponent<E, C>(E entity, C component) where E: Entity where C: IComponent
-        {
-            if (entityComponentMap.ContainsKey(entity.Id))
+			if (entity.Parent.Id != Id) throw new ArgumentException(nameof(entity));
+			if (entity == null) throw new ArgumentNullException(nameof(entity));
+			if (component == null) throw new ArgumentNullException(nameof(component));
+
+			if (entityComponentMap.ContainsKey(entity.Id))
             {
                 entityComponentMap[entity.Id].Item2.Add(component);
 				OnComponentAdded?.Invoke(this, new ComponentAddedEventArgs(entity, component));
@@ -222,7 +242,11 @@ namespace TS.ECS
         /// <param name="component">The component being removed</param>
         public void RemoveComponent<E, C>(E entity, C component) where E: Entity where C: IComponent
         {
-            if (entityComponentMap.ContainsKey(entity.Id))
+			if (entity.Parent.Id != Id) throw new ArgumentException(nameof(entity));
+			if (entity == null) throw new ArgumentNullException(nameof(entity));
+   			if (component == null) throw new ArgumentNullException(nameof(component));
+         
+			if (entityComponentMap.ContainsKey(entity.Id))
             {
 				if (entityComponentMap[entity.Id].Item2.Contains(component))
 				{
@@ -233,18 +257,6 @@ namespace TS.ECS
         }
         
         /// <summary>
-        /// Find the first component of type C belonging to the specified entity
-        /// </summary>
-        /// <typeparam name="E">type extending Entity</typeparam>
-        /// <typeparam name="C">type implementing IComponent</typeparam>
-        /// <param name="entity">the entity that the component belongs to</param>
-        /// <returns>The first component that matches the requested type or Null if none are found</returns>
-        public C GetComponent<E, C>(E entity) where E: Entity where C: IComponent
-        {
-            return (C)GetComponent(entity, typeof(C));
-        }
-
-        /// <summary>
         /// Find the first component of the specified type belonging to the specified entity
         /// </summary>
         /// <typeparam name="E">type extending Entity</typeparam>
@@ -253,6 +265,9 @@ namespace TS.ECS
         /// <returns>The first component that matches the requested type or Null if none are found</returns>
         internal IComponent GetComponent<E>(E entity, Type componentType) where E: Entity
         {
+			if (entity.Parent.Id != Id) throw new ArgumentException(nameof(entity));
+			if (entity == null) throw new ArgumentNullException(nameof(entity));
+
 			if (!componentType.GetInterfaces().Any(t => t == typeof(IComponent)))
 			{
 				throw new NotSupportedException(nameof(componentType));
@@ -266,21 +281,16 @@ namespace TS.ECS
         }
 
 		/// <summary>
-		/// Find all the components of type C belonging to the specified entity
+		/// Find the first component of type C belonging to the specified entity
 		/// </summary>
 		/// <typeparam name="E">type extending Entity</typeparam>
 		/// <typeparam name="C">type implementing IComponent</typeparam>
-		/// <param name="entity">the entity that the components belong to</param>
-		/// <returns>All the components that match the requested type or and empty List if none 
-		/// are found</returns>
-		public IEnumerable<C> GetComponents<E, C>(E entity) where E: Entity where C: IComponent
-        {
-            if (entityComponentMap.ContainsKey(entity.Id))
-            {
-                return entityComponentMap[entity.Id].Item2.Where(c => c is C).Cast<C>();
-            }
-            return new List<C>();
-        }
+		/// <param name="entity">the entity that the component belongs to</param>
+		/// <returns>The first component that matches the requested type or Null if none are found</returns>
+		public C GetComponent<E, C>(E entity) where E : Entity where C : IComponent
+		{
+			return (C)GetComponent(entity, typeof(C));
+		}
 
 		/// <summary>
 		/// Find all the components of the specified typeparamref name=""/> belonging to the 
@@ -293,6 +303,9 @@ namespace TS.ECS
 		/// are found</returns>
 		internal IEnumerable<IComponent> GetComponents<E>(E entity, Type componentType) where E: Entity
         {
+			if (entity.Parent.Id != Id) throw new ArgumentException(nameof(entity));
+			if (entity == null) throw new ArgumentNullException(nameof(entity));
+
 			if (!componentType.GetInterfaces().Any(t => t == typeof(IComponent)))
 			{
 				throw new NotSupportedException(nameof(componentType));
@@ -305,15 +318,31 @@ namespace TS.ECS
             return new List<IComponent>();
         }
         
-        /// <summary>
-        /// Find all the components belonging to the specified entity
-        /// </summary>
-        /// <typeparam name="E">type extending Entity</typeparam>
-        /// <param name="entity">The entity that we are interested in</param>
-        /// <returns>All the components linked to the specified entity</returns>
-        public IEnumerable<IComponent> GetAllComponents<E>(E entity) where E: Entity
+		/// <summary>
+		/// Find all the components of type C belonging to the specified entity
+		/// </summary>
+		/// <typeparam name="E">type extending Entity</typeparam>
+		/// <typeparam name="C">type implementing IComponent</typeparam>
+		/// <param name="entity">the entity that the components belong to</param>
+		/// <returns>All the components that match the requested type or and empty List if none 
+		/// are found</returns>
+		public IEnumerable<C> GetComponents<E, C>(E entity) where E : Entity where C : IComponent
+		{
+			return GetComponents(entity, typeof(C)).Cast<C>();
+		}
+
+		/// <summary>
+		/// Find all the components belonging to the specified entity
+		/// </summary>
+		/// <typeparam name="E">type extending Entity</typeparam>
+		/// <param name="entity">The entity that we are interested in</param>
+		/// <returns>All the components linked to the specified entity</returns>
+		public IEnumerable<IComponent> GetAllComponents<E>(E entity) where E: Entity
         {
-            if (entityComponentMap.ContainsKey(entity.Id))
+			if (entity.Parent.Id != Id) throw new ArgumentException(nameof(entity));
+			if (entity == null) throw new ArgumentNullException(nameof(entity));
+   
+			if (entityComponentMap.ContainsKey(entity.Id))
             {
                 return entityComponentMap[entity.Id].Item2.AsReadOnly();
             }
@@ -338,11 +367,18 @@ namespace TS.ECS
 		/// <param name="system">The system added to our list</param>
 		public void RegisterSystem<S>(S system) where S: BaseSystem
         {
+			if (system == null) throw new ArgumentNullException(nameof(system));
+
             if (!registeredSystems.Contains(system))
             {
                 registeredSystems.Add(system);
             }
-        }
+
+			if (!system.registeredManagers.Contains(this))
+			{
+				system.registeredManagers.Add(this);
+			}
+		}
         
 		/// <summary>
 		/// Remove the specified system from our list of systems updated with Tick
@@ -351,10 +387,81 @@ namespace TS.ECS
 		/// <param name="system">The system removed from our list</param>
         public void UnregisterSystem<S>(S system) where S: BaseSystem
         {
-            if (registeredSystems.Contains(system))
+			if (system == null) throw new ArgumentNullException(nameof(system));
+   
+			if (registeredSystems.Contains(system))
             {
                 registeredSystems.Remove(system);
             }
-        }
+
+			if (system.registeredManagers.Contains(this))
+			{
+				system.registeredManagers.Remove(this);
+			}
+		}
+
+		/// <summary>
+		/// Destroyeds the system.
+		/// </summary>
+		/// <param name="system">System.</param>
+		/// <typeparam name="S">The 1st type parameter.</typeparam>
+		internal void DestroyedSystem<S>(S system) where S : BaseSystem
+		{
+			if (registeredSystems.Contains(system))
+			{
+				registeredSystems.Remove(system);
+			}
+
+			foreach (var m in messageSubscribers.Values)
+			{
+				if (m.Contains(system))
+				{
+					m.Remove(system);
+				}
+			}
+		}
+
+		/// <summary>
+		/// Public implementation of Dispose pattern callable by consumers
+		/// </summary>
+		public void Dispose()
+		{
+			Dispose(true);
+
+			foreach (var system in registeredSystems)
+			{
+				system?.DestroyedManager(this);
+			}
+
+			foreach (var m in messageSubscribers.Values)
+			{
+				m.Clear();
+			}
+			messageSubscribers.Clear();
+
+			GC.SuppressFinalize(this);
+		}
+
+		/// <summary>
+		/// Protected implementation of Dispose pattern
+		/// </summary>
+		/// <param name="disposing">Do we have any managed objects to free?</param>
+		protected virtual void Dispose(bool disposing)
+		{
+		}
+
+		/// <summary>
+		/// Releases unmanaged resources and performs other cleanup operations before the <see cref="T:TS.ECS.Entity"/> is
+		/// reclaimed by garbage collection.
+		/// </summary>
+		~Manager()
+		{
+			Dispose(false);
+
+			foreach (var system in registeredSystems)
+			{
+				system?.DestroyedManager(this);
+			}
+		}
     }
 }
